@@ -1,4 +1,3 @@
-console.log("🚀 CI/CD test deployment works!");
 
 import express from "express";
 import Stripe from "stripe";
