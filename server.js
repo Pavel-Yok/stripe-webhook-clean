@@ -1,3 +1,4 @@
+console.log("🚀 Test deployment from GitHub CI/CD at " + new Date().toISOString());
 
 import express from "express";
 import Stripe from "stripe";
