@@ -15,10 +15,9 @@ const stripeSecretKey =
     ? process.env.STRIPE_LIVE_SECRET_KEY_ENV
     : process.env.STRIPE_TEST_SECRET_KEY_ENV;
 
-const webhookSecret = process.env.STRIPE_TEST_OVERRIDE ||
-  (process.env.STRIPE_MODE === "live"
-    ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
-    : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV);
+const webhookSecret = process.env.STRIPE_MODE === "live"
+  ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
+  : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
 
 if (!stripeSecretKey || !webhookSecret) {
   console.error("❌ Stripe secrets not found. Check your Cloud Run secret mappings.");
