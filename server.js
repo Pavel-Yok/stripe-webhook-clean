@@ -108,6 +108,9 @@ function trialEndingTemplate(date) {
 /* ======================
    Stripe Webhook Handler
 ====================== */
+/* ======================
+   Stripe Webhook Handler
+====================== */
 app.post(
   "/webhook",
   bodyParser.raw({ type: "application/json" }),
@@ -120,72 +123,111 @@ app.post(
         : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
 
     if (!stripeWebhookSecret) {
-      console.error(
-        "❌ Stripe webhook secret not found. Check your Cloud Run secret mappings."
-      );
+      console.error("❌ Stripe webhook secret not found.");
       return res.status(500).send("Server misconfigured");
     }
-
-    console.log(`✅ Stripe mode: ${process.env.STRIPE_MODE}`);
-    console.log(`✅ Stripe key loaded: ${stripeSecretKey ? "Yes" : "No"}`);
-    console.log(`✅ Webhook secret loaded: ${stripeWebhookSecret ? "Yes" : "No"}`);
 
     let event;
     try {
       event = Stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
       console.log("✅ Verified event received:", event.type);
     } catch (err) {
-      console.error("⚠️ Webhook signature verification failed.", err.message);
+      console.error("⚠️ Webhook signature verification failed:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // 🔹 Handle Stripe events
-    if (event.type === "invoice.paid") {
-      console.log("💰 Invoice paid event received!");
+    try {
+      switch (event.type) {
+        case "invoice.paid": {
+          console.log("💰 Invoice paid!");
+          let customerEmail = event.data.object.customer_email;
 
-      try {
-        oAuth2Client.setCredentials({
-          refresh_token: process.env.GOOGLE_REFRESH_TOKEN_ENV,
-        });
+          if (!customerEmail && event.data.object.customer) {
+            const customer = await stripe.customers.retrieve(event.data.object.customer);
+            customerEmail = customer.email;
+          }
 
-        const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
+          await sendMail({
+            to: customerEmail,
+            subject: "Payment Received",
+            body: paymentReceivedTemplate(
+              (event.data.object.amount_paid / 100).toFixed(2),
+              event.data.object.currency.toUpperCase()
+            ),
+          });
+          break;
+        }
 
-        const email = [
-          `To: ${event.data.object.customer_email || "pavel@yokweb.com"}`,
-          "Subject: ✅ Payment Received",
-          "Content-Type: text/plain; charset=utf-8",
-          "",
-          "Hi there,",
-          "",
-          "Your invoice was successfully paid. 🎉",
-          "",
-          "Thank you for your payment!",
-          "",
-          "— Your Stripe Webhook Server",
-        ].join("\n");
+        case "invoice.payment_failed": {
+          console.log("❌ Invoice payment failed!");
+          let customerEmail = event.data.object.customer_email;
+          if (!customerEmail && event.data.object.customer) {
+            const customer = await stripe.customers.retrieve(event.data.object.customer);
+            customerEmail = customer.email;
+          }
 
-        const encodedMessage = Buffer.from(email)
-          .toString("base64")
-          .replace(/\+/g, "-")
-          .replace(/\//g, "_")
-          .replace(/=+$/, "");
+          const session = await stripe.billingPortal.sessions.create({
+            customer: event.data.object.customer,
+            return_url: "https://yokweb.com/account",
+          });
 
-        await gmail.users.messages.send({
-          userId: "me",
-          requestBody: {
-            raw: encodedMessage,
-          },
-        });
+          await sendMail({
+            to: customerEmail,
+            subject: "Payment Failed — Update Your Card",
+            body: paymentFailedTemplate(session.url),
+          });
+          break;
+        }
 
-        console.log("📧 Gmail notification sent!");
-      } catch (err) {
-        console.error("❌ Failed to send Gmail notification:", err);
+        case "invoice.upcoming": {
+          console.log("📅 Upcoming invoice!");
+          let customerEmail = event.data.object.customer_email;
+          if (!customerEmail && event.data.object.customer) {
+            const customer = await stripe.customers.retrieve(event.data.object.customer);
+            customerEmail = customer.email;
+          }
+
+          await sendMail({
+            to: customerEmail,
+            subject: "Upcoming Renewal Reminder",
+            body: renewalReminderTemplate(
+              (event.data.object.amount_due / 100).toFixed(2),
+              event.data.object.currency.toUpperCase(),
+              new Date(event.data.object.next_payment_attempt * 1000).toLocaleDateString()
+            ),
+          });
+          break;
+        }
+
+        case "customer.subscription.trial_will_end": {
+          console.log("⏳ Trial ending soon!");
+          let customerEmail = event.data.object.customer_email;
+          if (!customerEmail && event.data.object.customer) {
+            const customer = await stripe.customers.retrieve(event.data.object.customer);
+            customerEmail = customer.email;
+          }
+
+          await sendMail({
+            to: customerEmail,
+            subject: "Trial Ending Soon",
+            body: trialEndingTemplate(
+              new Date(event.data.object.trial_end * 1000).toLocaleDateString()
+            ),
+          });
+          break;
+        }
+
+        default:
+          console.log("ℹ️ Unhandled event type:", event.type);
       }
+    } catch (err) {
+      console.error("❌ Error handling event:", err);
     }
 
     res.json({ received: true });
   }
 );
+
 
 
   // Continue handling event types below...
