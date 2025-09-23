@@ -94,7 +94,22 @@ function trialEndingTemplate(date) {
 
 app.post("/webhook", bodyParser.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
+
+  // Pick correct webhook secret depending on mode
+  const stripeWebhookSecret = process.env.STRIPE_MODE === "live"
+    ? process.env.STRIPE_LIVE_WEBHOOK_SECRET
+    : process.env.STRIPE_TEST_WEBHOOK_SECRET;
+
   let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+  } catch (err) {
+    console.error("⚠️ Webhook signature verification failed.", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Continue handling event types below...
 
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
