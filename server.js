@@ -12,6 +12,9 @@ const stripeSecretKey = process.env.STRIPE_MODE === "live"
   ? process.env.STRIPE_LIVE_SECRET_KEY
   : process.env.STRIPE_TEST_SECRET_KEY;
 
+console.log("🔑 Stripe mode:", process.env.STRIPE_MODE);
+console.log("🔑 Stripe key loaded:", stripeSecretKey ? "Yes" : "No");
+
 const stripe = new Stripe(stripeSecretKey);
 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
