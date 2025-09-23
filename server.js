@@ -1,3 +1,5 @@
+console.log("🔍 Test webhook secret begins with:", (process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV || "").slice(0, 7));
+
 import express from "express";
 import Stripe from "stripe";
 import { google } from "googleapis";
