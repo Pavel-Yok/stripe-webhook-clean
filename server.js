@@ -1,4 +1,3 @@
-console.log("🚀 Test deployment from GitHub CI/CD at " + new Date().toISOString());
 
 import express from "express";
 import Stripe from "stripe";
@@ -9,7 +8,12 @@ import bodyParser from "body-parser";
 dotenv.config();
 
 const app = express();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripeSecretKey = process.env.STRIPE_MODE === "live"
+  ? process.env.STRIPE_LIVE_SECRET_KEY
+  : process.env.STRIPE_TEST_SECRET_KEY;
+
+const stripe = new Stripe(stripeSecretKey);
+
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Gmail OAuth2 setup
