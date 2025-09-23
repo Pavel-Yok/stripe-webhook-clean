@@ -1,4 +1,3 @@
-console.log("🚀 Test no3 (13.14) deployment from GitHub CI/CD at", new Date().toISOString());
 
 import express from "express";
 import Stripe from "stripe";
@@ -10,11 +9,16 @@ dotenv.config();
 
 const app = express();
 const stripeSecretKey = process.env.STRIPE_MODE === "live"
-  ? process.env.STRIPE_LIVE_SECRET_KEY
-  : process.env.STRIPE_TEST_SECRET_KEY;
+  ? process.env.STRIPE_LIVE_SECRET_KEY_ENV
+  : process.env.STRIPE_TEST_SECRET_KEY_ENV;
 
-console.log("🔑 Stripe mode:", process.env.STRIPE_MODE);
-console.log("🔑 Stripe key loaded:", stripeSecretKey ? "Yes" : "No");
+if (!stripeSecretKey) {
+  console.error("❌ Stripe secret key not found. Check your Cloud Run secret mappings.");
+  process.exit(1);
+}
+
+console.log("🔑 Stripe mode1:", process.env.STRIPE_MODE);
+console.log("🔑 Stripe key loaded1:", stripeSecretKey ? "Yes" : "No");
 
 const stripe = new Stripe(stripeSecretKey);
 
@@ -22,11 +26,11 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Gmail OAuth2 setup
 const oAuth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
+  process.env.GOOGLE_CLIENT_ID_ENV,
+  process.env.GOOGLE_CLIENT_SECRET_ENV,
+  process.env.GOOGLE_REDIRECT_URI_ENV
 );
-oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN_ENV });
 const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
 
 /* ======================
@@ -105,9 +109,18 @@ app.post("/webhook", bodyParser.raw({ type: "application/json" }), async (req, r
 
   // Pick correct webhook secret depending on mode
   const stripeWebhookSecret = process.env.STRIPE_MODE === "live"
-    ? process.env.STRIPE_LIVE_WEBHOOK_SECRET
-    : process.env.STRIPE_TEST_WEBHOOK_SECRET;
+    ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
+    : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
 
+  if (!stripeWebhookSecret) {
+  console.error("❌ Stripe webhook secret not found. Check your Cloud Run secret mappings.");
+  process.exit(1);
+}
+
+console.log(`✅ Stripe mode2: ${process.env.STRIPE_MODE}`);
+console.log(`✅ Stripe key loaded2: ${stripeSecretKey ? "Yes" : "No"}`);
+console.log(`✅ Webhook secret loaded2: ${webhookSecret ? "Yes" : "No"}`);
+  
   let event;
 
   try {
