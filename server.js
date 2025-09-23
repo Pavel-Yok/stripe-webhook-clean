@@ -8,6 +8,11 @@ import bodyParser from "body-parser";
 dotenv.config();
 
 const app = express();
+
+const webhookSecret = process.env.STRIPE_MODE === "live"
+  ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
+  : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
+
 const stripeSecretKey = process.env.STRIPE_MODE === "live"
   ? process.env.STRIPE_LIVE_SECRET_KEY_ENV
   : process.env.STRIPE_TEST_SECRET_KEY_ENV;
@@ -103,32 +108,85 @@ function trialEndingTemplate(date) {
 /* ======================
    Stripe Webhook Handler
 ====================== */
+app.post(
+  "/webhook",
+  bodyParser.raw({ type: "application/json" }),
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
 
-app.post("/webhook", bodyParser.raw({ type: "application/json" }), async (req, res) => {
-  const sig = req.headers["stripe-signature"];
+    const stripeWebhookSecret =
+      process.env.STRIPE_MODE === "live"
+        ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
+        : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
 
-  // Pick correct webhook secret depending on mode
-  const stripeWebhookSecret = process.env.STRIPE_MODE === "live"
-    ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
-    : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
+    if (!stripeWebhookSecret) {
+      console.error(
+        "❌ Stripe webhook secret not found. Check your Cloud Run secret mappings."
+      );
+      return res.status(500).send("Server misconfigured");
+    }
 
-  if (!stripeWebhookSecret) {
-  console.error("❌ Stripe webhook secret not found. Check your Cloud Run secret mappings.");
-  process.exit(1);
-}
+    console.log(`✅ Stripe mode: ${process.env.STRIPE_MODE}`);
+    console.log(`✅ Stripe key loaded: ${stripeSecretKey ? "Yes" : "No"}`);
+    console.log(`✅ Webhook secret loaded: ${stripeWebhookSecret ? "Yes" : "No"}`);
 
-console.log(`✅ Stripe mode2: ${process.env.STRIPE_MODE}`);
-console.log(`✅ Stripe key loaded2: ${stripeSecretKey ? "Yes" : "No"}`);
-console.log(`✅ Webhook secret loaded2: ${webhookSecret ? "Yes" : "No"}`);
-  
-  let event;
+    let event;
+    try {
+      event = Stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+      console.log("✅ Verified event received:", event.type);
+    } catch (err) {
+      console.error("⚠️ Webhook signature verification failed.", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
 
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
-  } catch (err) {
-    console.error("⚠️ Webhook signature verification failed.", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    // 🔹 Handle Stripe events
+    if (event.type === "invoice.paid") {
+      console.log("💰 Invoice paid event received!");
+
+      try {
+        oAuth2Client.setCredentials({
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN_ENV,
+        });
+
+        const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
+
+        const email = [
+          `To: ${event.data.object.customer_email || "pavel@yokweb.com"}`,
+          "Subject: ✅ Payment Received",
+          "Content-Type: text/plain; charset=utf-8",
+          "",
+          "Hi there,",
+          "",
+          "Your invoice was successfully paid. 🎉",
+          "",
+          "Thank you for your payment!",
+          "",
+          "— Your Stripe Webhook Server",
+        ].join("\n");
+
+        const encodedMessage = Buffer.from(email)
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+
+        await gmail.users.messages.send({
+          userId: "me",
+          requestBody: {
+            raw: encodedMessage,
+          },
+        });
+
+        console.log("📧 Gmail notification sent!");
+      } catch (err) {
+        console.error("❌ Failed to send Gmail notification:", err);
+      }
+    }
+
+    res.json({ received: true });
   }
+);
+
 
   // Continue handling event types below...
 
