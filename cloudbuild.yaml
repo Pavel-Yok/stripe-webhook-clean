@@ -1,13 +1,13 @@
 steps:
-  # Build the container
+  # Build container
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/stripe-webhook:$COMMIT_SHA', '.']
 
-  # Push container to Artifact Registry
+  # Push container
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/stripe-webhook:$COMMIT_SHA']
 
-  # Deploy to Cloud Run
+  # Deploy with secrets
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -19,7 +19,15 @@ steps:
         'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/stripe-webhook:$COMMIT_SHA',
         '--region',
         'europe-west1',
-        '--allow-unauthenticated'
+        '--allow-unauthenticated',
+
+        # Non-secret
+        '--set-env-vars',
+        'STRIPE_MODE=test',
+
+        # Secrets
+        '--set-secrets',
+        'STRIPE_TEST_SECRET_KEY_ENV=stripe-test-secret-key:latest,STRIPE_TEST_WEBHOOK_SECRET_ENV=stripe-test-webhook-secret:latest,GOOGLE_CLIENT_ID_ENV=google-client-id:latest,GOOGLE_CLIENT_SECRET_ENV=google-client-secret:latest,GOOGLE_REFRESH_TOKEN_ENV=google-refresh-token:latest,GOOGLE_REDIRECT_URI_ENV=google-redirect-uri:latest'
       ]
 
 images:
