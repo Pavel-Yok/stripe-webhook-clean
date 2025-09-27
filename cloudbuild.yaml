@@ -1,8 +1,30 @@
 steps:
-  # Build and Push steps remain the same
+  # 1. Build container with commit SHA tag
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args: [
+      'build',
+      '-t', 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/stripe-webhook:$COMMIT_SHA',
+      '.'
+    ]
 
-  # Deploy to Cloud Run (CORRECTED CASE HERE)
+  # 2. Push container
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args: [
+      'push',
+      'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/stripe-webhook:$COMMIT_SHA'
+    ]
+
+  # 3. Wait for Artifact Registry sync
+  - name: 'ubuntu'
+    id: 'wait-for-registry'
+    entrypoint: 'bash'
+    args: ['-c', 'echo "Waiting 30 seconds for image registry sync..." && sleep 30']
+
+  # 4. Deploy to Cloud Run with secrets and env vars
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-service'
     entrypoint: gcloud
     args:
       [
@@ -14,14 +36,11 @@ steps:
         '--region',
         'europe-west1',
         '--allow-unauthenticated',
-        
-        # --- Environment Variables ---
         '--set-env-vars',
-        'STRIPE_MODE=test', 
+        'STRIPE_MODE=test',
 
-        # --- Secret Manager Injection (Corrected Case) ---
-        '--set-secrets',
-        'STRIPE_TEST_SECRET_KEY_ENV=STRIPE_TEST_SECRET_KEY:latest,STRIPE_TEST_WEBHOOK_SECRET_ENV=STRIPE_TEST_WEBHOOK_SECRET:latest,GOOGLE_CLIENT_ID_ENV=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET_ENV=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REFRESH_TOKEN_ENV=GOOGLE_REFRESH_TOKEN:latest,GOOGLE_REDIRECT_URI_ENV=GOOGLE_REDIRECT_URI:latest'
+'--set-secrets',
+'STRIPE_TEST_SECRET_KEY_ENV=STRIPE_TEST_SECRET_KEY:latest,STRIPE_TEST_WEBHOOK_SECRET_ENV=STRIPE_TEST_WEBHOOK_SECRET:latest,GOOGLE_CLIENT_ID_ENV=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET_ENV=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REFRESH_TOKEN_ENV=GOOGLE_REFRESH_TOKEN:latest,GOOGLE_REDIRECT_URI_ENV=GOOGLE_REDIRECT_URI:latest'
       ]
 
 images:
