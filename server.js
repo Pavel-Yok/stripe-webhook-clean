@@ -37,6 +37,7 @@ if (!stripeSecretKey || !webhookSecret) {
 
 console.log("🔑 Stripe mode:", process.env.STRIPE_MODE);
 console.log("🔑 Webhook secret begins with:", webhookSecret.slice(0, 7));
+console.log("🔑 Using webhookSecret:", webhookSecret); 
 
 const stripe = new Stripe(stripeSecretKey);
 
@@ -180,38 +181,23 @@ async function sendMail({ to, subject, body }) {
    Stripe Webhook Handler
 ====================== */
 // CRITICAL: Use bodyParser.raw() ONLY for this endpoint
+// Stripe Webhook Handler
+// IMPORTANT: Only use bodyParser.raw here, not express.json or bodyParser.json globally!
 app.post("/webhook", bodyParser.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
 
-  // Debug log
-  console.log("🔎 Stripe mode:", process.env.STRIPE_MODE);
-  console.log("🔎 WebhookSecret length:", webhookSecret ? webhookSecret.length : "undefined");
-  console.log("🔎 WebhookSecret raw:", JSON.stringify(webhookSecret));
-   
-console.log("🔎 req.body type:", typeof req.body);
-  console.log("🔎 Is Buffer?", Buffer.isBuffer(req.body));
-  console.log("🔎 Raw body length:", req.body.length);
-  console.log("🔎 Stripe-Signature header:", req.headers["stripe-signature"]);
-  if (Buffer.isBuffer(req.body)) {
-    console.log("🔎 Raw body preview:", req.body.toString("utf8").slice(0, 100));
-  }
-
-   
-  // 1. Signature Verification
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     console.log("✅ Webhook event verified:", event.type);
   } catch (err) {
-    console.error("⚠️ Webhook signature verification failed.", err.message);
-    // CRITICAL FIX: The next likely failure point—ensure no whitespace in webhookSecret value!
+    console.error("❌ Webhook signature verification failed:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Return 200 immediately to prevent Stripe retries
+  // Acknowledge immediately so Stripe doesn’t retry
   res.json({ received: true });
 
-  // 2. Event Processing (should happen asynchronously after response)
   try {
     let customerEmail = event.data.object.customer_email;
     if (!customerEmail && event.data.object.customer) {
@@ -220,42 +206,35 @@ console.log("🔎 req.body type:", typeof req.body);
     }
 
     switch (event.type) {
-      
-      // 🟢 NEW CORE LOGIC: Send the Actual Invoice
       case "invoice.finalized": {
-        const invoiceObject = event.data.object;
-        const invoiceUrl = invoiceObject.hosted_invoice_url;
-        const invoiceNumber = invoiceObject.number; 
-        const amount = invoiceObject.amount_due;
-        const currency = invoiceObject.currency;
-
-        if (!invoiceUrl || !invoiceNumber) {
-            console.error("⚠️ Finalized invoice missing hosted URL or number. Skipping email.");
-            break; 
-        }
-
+        const invoice = event.data.object;
         await sendMail({
-            to: customerEmail,
-            subject: `Invoice ${invoiceNumber} from Yokweb is Due`,
-            body: finalizedInvoiceTemplate(invoiceUrl, invoiceNumber, amount, currency),
+          to: customerEmail,
+          subject: `Invoice ${invoice.number} from Yokweb is Due`,
+          body: finalizedInvoiceTemplate(
+            invoice.hosted_invoice_url,
+            invoice.number,
+            invoice.amount_due,
+            invoice.currency
+          ),
         });
         break;
       }
 
       case "invoice.paid": {
-        const amount = event.data.object.amount_paid;
-        const currency = event.data.object.currency;
+        const invoice = event.data.object;
         await sendMail({
           to: customerEmail,
           subject: "Payment Received - Thank You",
-          body: paymentReceivedTemplate(amount, currency),
+          body: paymentReceivedTemplate(invoice.amount_paid, invoice.currency),
         });
         break;
       }
 
       case "invoice.payment_failed": {
+        const invoice = event.data.object;
         const session = await stripe.billingPortal.sessions.create({
-          customer: event.data.object.customer,
+          customer: invoice.customer,
           return_url: "https://yokweb.com/account",
         });
         await sendMail({
@@ -265,21 +244,21 @@ console.log("🔎 req.body type:", typeof req.body);
         });
         break;
       }
-      
+
       case "invoice.upcoming": {
-        const amount = event.data.object.amount_due;
-        const currency = event.data.object.currency;
-        const date = new Date(event.data.object.next_payment_attempt * 1000).toLocaleDateString();
+        const invoice = event.data.object;
+        const date = new Date(invoice.next_payment_attempt * 1000).toLocaleDateString();
         await sendMail({
           to: customerEmail,
           subject: "Upcoming Renewal Reminder",
-          body: renewalReminderTemplate(amount, currency, date),
+          body: renewalReminderTemplate(invoice.amount_due, invoice.currency, date),
         });
         break;
       }
 
       case "customer.subscription.trial_will_end": {
-        const date = new Date(event.data.object.trial_end * 1000).toLocaleDateString();
+        const subscription = event.data.object;
+        const date = new Date(subscription.trial_end * 1000).toLocaleDateString();
         await sendMail({
           to: customerEmail,
           subject: "Trial Ending Soon",
@@ -295,6 +274,7 @@ console.log("🔎 req.body type:", typeof req.body);
     console.error("❌ Error handling event logic:", err);
   }
 });
+
 
 /* ======================
    Health Check
