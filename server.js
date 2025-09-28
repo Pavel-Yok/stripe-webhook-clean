@@ -184,6 +184,11 @@ app.post("/webhook", bodyParser.raw({ type: "application/json" }), async (req, r
   const sig = req.headers["stripe-signature"];
   let event;
 
+  // Debug log
+  console.log("🔎 Stripe mode:", process.env.STRIPE_MODE);
+  console.log("🔎 WebhookSecret length:", webhookSecret ? webhookSecret.length : "undefined");
+  console.log("🔎 WebhookSecret raw:", JSON.stringify(webhookSecret));
+
   // 1. Signature Verification
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
