@@ -28,19 +28,18 @@ steps:
     entrypoint: gcloud
     args:
       [
-        'run',
-        'deploy',
-        'stripe-webhook',
-        '--image',
-        'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/stripe-webhook:$COMMIT_SHA',
-        '--region',
-        'europe-west1',
-        '--allow-unauthenticated',
-        '--set-env-vars',
-        'STRIPE_MODE=test',
-
-'--set-secrets',
-'STRIPE_TEST_SECRET_KEY_ENV=STRIPE_TEST_SECRET_KEY:latest,STRIPE_TEST_WEBHOOK_SECRET_ENV=STRIPE_TEST_WEBHOOK_SECRET:latest,GOOGLE_CLIENT_ID_ENV=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET_ENV=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REFRESH_TOKEN_ENV=GOOGLE_REFRESH_TOKEN:latest,GOOGLE_REDIRECT_URI_ENV=GOOGLE_REDIRECT_URI:latest'
+        run,
+    deploy,
+    stripe-webhook,
+    --image,
+    europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/stripe-webhook:$COMMIT_SHA,
+    --region,
+    europe-west1,
+    --allow-unauthenticated,
+    --set-env-vars,
+    STRIPE_MODE=live,
+    --set-secrets,
+STRIPE_TEST_SECRET_KEY_ENV=STRIPE_TEST_SECRET_KEY:latest,STRIPE_TEST_WEBHOOK_SECRET_ENV=STRIPE_TEST_WEBHOOK_SECRET:latest,GOOGLE_CLIENT_ID_ENV=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET_ENV=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REFRESH_TOKEN_ENV=GOOGLE_REFRESH_TOKEN:latest,GOOGLE_REDIRECT_URI_ENV=GOOGLE_REDIRECT_URI:latest
       ]
 
 images:
