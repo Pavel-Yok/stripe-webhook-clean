@@ -14,11 +14,11 @@ const app = express();
 const SENDER_EMAIL = 'pavel@yokweb.com'; // 🟢 FINAL SENDER EMAIL
 
 const stripeSecretKey =
-  process.env.STRIPE_MODE === "live"
+  process.env.STRIPE_MODE === "test"
     ? process.env.STRIPE_LIVE_SECRET_KEY_ENV
     : process.env.STRIPE_TEST_SECRET_KEY_ENV;
 
-const webhookSecret = process.env.STRIPE_MODE === "live"
+const webhookSecret = process.env.STRIPE_MODE === "test"
   ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
   : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
 
