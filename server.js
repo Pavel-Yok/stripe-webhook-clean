@@ -188,7 +188,16 @@ app.post("/webhook", bodyParser.raw({ type: "application/json" }), async (req, r
   console.log("🔎 Stripe mode:", process.env.STRIPE_MODE);
   console.log("🔎 WebhookSecret length:", webhookSecret ? webhookSecret.length : "undefined");
   console.log("🔎 WebhookSecret raw:", JSON.stringify(webhookSecret));
+   
+console.log("🔎 req.body type:", typeof req.body);
+  console.log("🔎 Is Buffer?", Buffer.isBuffer(req.body));
+  console.log("🔎 Raw body length:", req.body.length);
+  console.log("🔎 Stripe-Signature header:", req.headers["stripe-signature"]);
+  if (Buffer.isBuffer(req.body)) {
+    console.log("🔎 Raw body preview:", req.body.toString("utf8").slice(0, 100));
+  }
 
+   
   // 1. Signature Verification
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
