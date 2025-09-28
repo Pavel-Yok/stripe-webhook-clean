@@ -13,14 +13,21 @@ const app = express();
 ====================== */
 const SENDER_EMAIL = 'pavel@yokweb.com'; // 🟢 FINAL SENDER EMAIL
 
-const stripeSecretKey =
-  process.env.STRIPE_MODE === "test"
-    ? process.env.STRIPE_LIVE_SECRET_KEY_ENV
-    : process.env.STRIPE_TEST_SECRET_KEY_ENV;
+// server.js (Corrected Configuration Block)
 
-const webhookSecret = process.env.STRIPE_MODE === "test"
-  ? process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV
-  : process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV;
+const stripeSecretKey =
+  // 🟢 FIX 1: If MODE is "test", use the TEST secret key
+  process.env.STRIPE_MODE === "test"
+    ? process.env.STRIPE_TEST_SECRET_KEY_ENV  // <-- Use TEST key
+    : process.env.STRIPE_LIVE_SECRET_KEY_ENV; // <-- Else, use LIVE key
+
+const webhookSecret = 
+  // 🟢 FIX 2: If MODE is "test", use the TEST webhook secret
+  process.env.STRIPE_MODE === "test"
+    ? process.env.STRIPE_TEST_WEBHOOK_SECRET_ENV // <-- Use TEST webhook secret
+    : process.env.STRIPE_LIVE_WEBHOOK_SECRET_ENV; // <-- Else, use LIVE webhook secret
+
+// ... rest of the file ...
 
 if (!stripeSecretKey || !webhookSecret) {
   console.error("❌ Stripe secrets not found. Check your Cloud Run secret mappings.");
