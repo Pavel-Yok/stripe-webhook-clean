@@ -8,7 +8,7 @@ import bodyParser from "body-parser";
 
 const app = express();
 
-/* ======================
+/* =====================
    Configuration
 ====================== */
 const SENDER_EMAIL = 'pavel@yokweb.com'; // 🟢 FINAL SENDER EMAIL
