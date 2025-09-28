@@ -285,7 +285,7 @@ app.post("/webhook", bodyParser.raw({ type: "application/json" }), async (req, r
 /* ======================
    Health Check
 ====================== */
-app.get("/", (req, res) => {
+app.get("/webhook", (req, res) => {
   res.send("✅ Stripe Webhook service is running");
 });
 
